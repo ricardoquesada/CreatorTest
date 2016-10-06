@@ -12,6 +12,7 @@ import json
 import glob
 from pprint import pprint
 import getopt
+from sets import Set
 
 
 __docformat__ = 'restructuredtext'
@@ -37,6 +38,14 @@ g_meta_data = {}
 # key is the uuid. value is the json container
 g_sprite_frames = {}
 
+# sprites that don't belong to any atlas
+# should be added to the SpriteFrameCache manually
+g_sprite_without_atlas = {}
+
+# sprites that belong to atlas files
+# atlas file should be added to the SpriteFrameCache manually
+g_sprite_with_atlas = []
+
 # contains the textures used
 # key is the uuid. value is the json container
 g_textures = {}
@@ -55,6 +64,7 @@ def globals_init():
     global g_filename, g_json_data, g_meta_data
     global g_file_cpp, g_file_h
     global g_sprite_frames, g_textures, g_uuid
+    global g_sprite_without_atlas, g_sprite_with_atlas
     global g_design_resolution, g_resources_needed
     global g_assetpath
 
@@ -62,6 +72,8 @@ def globals_init():
     g_json_data = []
     g_meta_data = {}
     g_sprite_frames = {}
+    g_sprite_without_atlas = {}
+    g_sprite_with_atlas = []
     g_textures = {}
     g_uuid = {}
     g_design_resolution = None
@@ -264,6 +276,9 @@ class Sprite(Node):
             self._sprite_frame_uuid = component['_spriteFrame']['__uuid__']
             print(g_sprite_frames[self._sprite_frame_uuid])
 
+
+#        atlas = component['_atlas']
+
         # add name between ""
         #self._properties['setSpriteFrame'] = '"' + g_sprite_frames[self.sprite_frame_uuid] + '"'
 
@@ -278,9 +293,16 @@ class Sprite(Node):
 
 
 class Label(Node):
+
+    FONT_SYSTEM, FONT_TTF, FONT_BM = range(3)
+    H_ALIGNMENTS = ('TextHAlignment::LEFT', 'TextHAlignment::CENTER', 'TextHAlignment::RIGHT')
+    V_ALIGNMENTS = ('TextVAlignment::TOP', 'TextVAlignment::CENTER', 'TextVAlignment::BOTTOM')
+
     def __init__(self, data):
         super(Label, self).__init__(data)
         self._label_text = ""
+        self._font_type = Label.FONT_SYSTEM
+        self._font_filename = None
 
     def parse_properties(self):
         super(Label, self).parse_properties()
@@ -288,20 +310,40 @@ class Label(Node):
         # search for sprite frame name
         component = Node.get_node_component_of_type(self._node_data, 'cc.Label')
 
-        self._systemFont = component["_isSystemFontUsed"]
+        is_system_font = component["_isSystemFontUsed"]
+        self._font_size = component['_fontSize']
+        self._label_text = component['_N$string']
 
-        if not self._systemFont:
-            self._properties['setString'] = '"' + component['_N$string'] + '"'
-            self._properties['setLineHeight'] = component['_lineHeight']
+        # replace new lines with \n
+        self._label_text = self._label_text.replace('\n','\\n')
+
+        # alignments
+        self._properties['setHorizontalAlignment'] = Label.H_ALIGNMENTS[component['_N$horizontalAlign']]
+        self._properties['setVerticalAlignment'] = Label.V_ALIGNMENTS[component['_N$verticalAlign']]
+
+        if is_system_font:
+            self._font_type = Label.FONT_SYSTEM
         else:
-            self._labelText = component['_N$string']
-            self._fontSize = component['_fontSize']
+            file_uuid = component['_N$file']['__uuid__']
+            self._font_filename = g_uuid[file_uuid]['relativePath']
+            if self._font_filename.endswith('.ttf'):
+                self._font_type = Label.FONT_TTF
+            elif self._font_filename.endswith('.fnt'):
+                self._font_type = Label.FONT_BM
+                self._properties['setBMFontSize'] = component['_fontSize']
+            else:
+                raise Exception("Invalid label file: %s" % filename)
+
+            # needed for multiline. lineHeight not supported in SystemFONT
+            self._properties['setLineHeight'] = component['_lineHeight']
 
     def to_cpp_create_params(self):
-        if self._systemFont:
-            return 'createWithSystemFont("' + self._labelText + '", "arial", ' + str(self._fontSize) + ')'
-        else:
-            return 'create()'
+        if self._font_type == Label.FONT_SYSTEM:
+            return 'createWithSystemFont("' + self._label_text + '", "arial", ' + str(self._font_size) + ')'
+        elif self._font_type == Label.FONT_BM:
+            return 'createWithBMFont("' + g_assetpath + self._font_filename + '", "' + self._label_text + '")'
+        elif self._font_type == Label.FONT_TTF:
+            return 'createWithTTF("' + self._label_text + '", "'+ g_assetpath + self._font_filename + '", ' + str(self._font_size) + ')'
 
     def get_description(self, tab):
         return "%s%s('%s')" % ('-' * tab, self.get_class_name(), self._label_text)
@@ -366,6 +408,7 @@ class Canvas(Node):
 
 def populate_meta_files(path):
     global g_meta_data, g_sprite_frames, g_textures
+    global g_sprite_with_atlas, g_sprite_without_atlas
     metas = glob.glob(path + '/*.meta')
     for meta_filename in metas:
         with open(meta_filename) as fd:
@@ -373,8 +416,10 @@ def populate_meta_files(path):
             j_data = json.load(fd)
             g_meta_data[basename] = j_data
 
+            meta_uuid = j_data['uuid']
+
             # is this a sprite (.png) file ?
-            if 'type' in j_data and j_data['type'] == 'sprite':
+            if 'type' in j_data and (j_data['type'] == 'sprite' or j_data['type'] == 'Texture Packer'):
                 # subMetas seems to contain all the sprite frame definitions
                 submetas = j_data['subMetas']
                 for spriteframename in submetas:
@@ -388,6 +433,13 @@ def populate_meta_files(path):
                     # populate g_textures. The name is meta_filename - '.meta' (5 chars)
                     texture_uuid = submetas[spriteframename]['rawTextureUuid']
                     g_textures[texture_uuid] = os.path.basename(meta_filename[:-5])
+
+                    if j_data['type'] == 'sprite':
+                        g_sprite_without_atlas[uuid] = submetas[spriteframename]
+                    elif j_data['type'] == 'Texture Packer':
+                        g_sprite_with_atlas.append(g_uuid[meta_uuid]['relativePath'])
+                    else:
+                        raise Exception("Invalid type: %s" % j_data['type'])
 
 
 def populate_uuid_file(path):
@@ -423,8 +475,10 @@ bool %s_init()
 
 
 def to_cpp_setup_sprite_frames():
+    for k in Set(g_sprite_with_atlas):
+        g_file_cpp.write('    SpriteFrameCache::getInstance()->addSpriteFramesWithFile("%s");\n' % (g_assetpath + k))
 
-    for k in g_sprite_frames:
+    for k in g_sprite_without_atlas:
         sprite_frame = g_sprite_frames[k]
         texture_uuid = sprite_frame['rawTextureUuid']
         texture_filename = g_uuid[texture_uuid]['relativePath']
@@ -466,8 +520,10 @@ def run(filename, assetpath):
     g_file_h = create_file(h_name)
 
     path = os.path.dirname(filename)
-    populate_meta_files(path)
+    # 1st
     populate_uuid_file(path)
+    # 2nd
+    populate_meta_files(path)
 
     global g_json_data
     with open(filename) as data_file:

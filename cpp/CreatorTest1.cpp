@@ -3,19 +3,24 @@
 
 USING_NS_CC;
 
-bool MainScene_init()
+bool CreatorTest1_init()
 {
     auto director = Director::getInstance();
     auto glview = director->getOpenGLView();
     glview->setDesignResolutionSize(960, 640, ResolutionPolicy::FIXED_HEIGHT);
+    SpriteFrameCache::getInstance()->addSpriteFramesWithFile("creator_assets/test_polygon.plist");
     auto sf_grossini_dance_08 = SpriteFrame::create("creator_assets/grossini_dance_08.png", Rect(17, 7, 51, 109), false, Vec2(0, -1), Size(85, 121));
     SpriteFrameCache::getInstance()->addSpriteFrame(sf_grossini_dance_08, "grossini_dance_08");
+    auto sf_arial16 = SpriteFrame::create("creator_assets/arial16.png", Rect(0, 0, 510, 61), false, Vec2(-1, 225.5), Size(512, 512));
+    SpriteFrameCache::getInstance()->addSpriteFrame(sf_arial16, "arial16");
+    auto sf_test_polygon = SpriteFrame::create("creator_assets/test_polygon.png", Rect(4, 2, 380, 152), false, Vec2(0.5, 0.5), Size(387, 157));
+    SpriteFrameCache::getInstance()->addSpriteFrame(sf_test_polygon, "test_polygon");
     auto sf_iso_test = SpriteFrame::create("creator_assets/iso-test.png", Rect(2, 1, 319, 116), false, Vec2(-94.5, 69), Size(512, 256));
     SpriteFrameCache::getInstance()->addSpriteFrame(sf_iso_test, "iso_test");
 
     return true;
 }
-Node* MainScene_create()
+Node* CreatorTest1_create()
 {
     // New node
     auto scene_0_0 = Scene::create();
@@ -110,11 +115,13 @@ Node* MainScene_create()
     label_1_5->setScaleX(1);
     label_1_5->setColor(Color3B(255, 255, 255));
     label_1_5->setName("Label_1");
+    label_1_5->setVerticalAlignment(TextVAlignment::CENTER);
     label_1_5->setLocalZOrder(0);
     label_1_5->setGlobalZOrder(0);
     label_1_5->setOpacity(255);
     label_1_5->setOpacityModifyRGB(false);
     label_1_5->setCascadeOpacityEnabled(true);
+    label_1_5->setHorizontalAlignment(TextHAlignment::CENTER);
     label_1_5->setTag(-1);
     label_1_5->setPosition(Vec2(437, 606));
     label_1_5->setSkewY(0);
@@ -129,11 +136,13 @@ Node* MainScene_create()
     label_1_6->setScaleX(1);
     label_1_6->setColor(Color3B(255, 255, 255));
     label_1_6->setName("Label_2");
+    label_1_6->setVerticalAlignment(TextVAlignment::CENTER);
     label_1_6->setLocalZOrder(0);
     label_1_6->setGlobalZOrder(0);
     label_1_6->setOpacity(255);
     label_1_6->setOpacityModifyRGB(false);
     label_1_6->setCascadeOpacityEnabled(true);
+    label_1_6->setHorizontalAlignment(TextHAlignment::CENTER);
     label_1_6->setTag(-1);
     label_1_6->setPosition(Vec2(107, 289));
     label_1_6->setSkewY(0);
