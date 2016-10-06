@@ -264,19 +264,29 @@ class Scene(Node):
 class Sprite(Node):
     def __init__(self, data):
         super(Sprite, self).__init__(data)
+        self._sprite_frame_uuid = ''
 
     def parse_properties(self):
         super(Sprite, self).parse_properties()
 
         # search for sprite frame name
         component = Node.get_node_component_of_type(self._node_data, 'cc.Sprite')
-        sprite_frame_uuid = component['_spriteFrame']['__uuid__']
+
+        if component['_spriteFrame']:
+            self._sprite_frame_uuid = component['_spriteFrame']['__uuid__']
+            print(g_sprite_frames[self._sprite_frame_uuid])
+
 
 #        atlas = component['_atlas']
 
         # add name between ""
-        self._properties['setSpriteFrame'] = '"' + g_sprite_frames[sprite_frame_uuid]['frameName'] + '"'
-        print(g_sprite_frames[sprite_frame_uuid])
+        #self._properties['setSpriteFrame'] = '"' + g_sprite_frames[self.sprite_frame_uuid] + '"'
+
+    def to_cpp_create_params(self):
+        if self._sprite_frame_uuid:
+            return 'createWithSpriteFrameName("' + g_sprite_frames[self._sprite_frame_uuid]['frameName'] + '")'
+        else:
+            return 'create()'
 
     def get_description(self, tab):
         return "%s%s('%s')" % ('-' * tab, self.get_class_name(), self._properties['setSpriteFrame'])
