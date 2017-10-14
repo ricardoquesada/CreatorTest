@@ -58,6 +58,7 @@ CreatorReader* CreatorReader::createWithFilename(const std::string& filename)
         reader->autorelease();
         return reader;
     }
+    delete reader;
     return nullptr;
 }
 
